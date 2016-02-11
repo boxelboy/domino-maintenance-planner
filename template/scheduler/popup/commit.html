@@ -1,0 +1,39 @@
+<script>
+  $(function() {
+    $( "#start_date" ).datepicker({ dateFormat: "dd-mm-yy" });
+    $( "#end_date" ).datepicker({ dateFormat: "dd-mm-yy" });
+  });
+</script>
+
+<div class="modals-container">
+    <div class="bbm-wrapper" style="display: block;">
+        <div class="bbm-modal bbm-modal--open" style="opacity: 1;">
+            <div class="bbm-modal__topbar">
+                <h3 class="bbm-modal__title">Commit Maintenance<span style="float:right">Contract ID : <%= contract %></h3>
+            </div>
+            <div class="bbm-modal__section">
+
+            	<form>
+	                <div class="col-md-6">
+	                    Please select a start and end date to commit scheduled maintenace to the planner.
+	                </div>
+
+	                <div class="col-md-6">
+	                    <label for="description">Start Date</label>
+	                    <div style="clear:both"></div>
+	                    <input type="text" name="start_date" id="start_date" class="form-control halfWidth" value="">
+                        <div style="clear:both"></div>
+
+	                    <label for="description">End Date</label>
+	                    <div style="clear:both"></div>
+	                    <input type="text" name="end_date" id="end_date" class="form-control halfWidth" value="">
+	                </div>
+                </form>
+
+            </div>
+            <div class="bbm-modal__bottombar">
+                <a href="" class="bbm-button saveModal">Save</a> | <a href="" class="bbm-button closeModal">Close</a>
+            </div>
+        </div>
+    </div>
+</div>

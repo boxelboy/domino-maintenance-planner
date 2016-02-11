@@ -1,0 +1,11 @@
+<app>
+<functions>
+    <function>
+        <name>MaintenancePlanner</name>
+        <type>url</type>
+        <url><![CDATA[index.html]]></url>
+        <parameters>
+        </parameters>
+    </function>
+</functions>
+</app>

@@ -1,0 +1,1 @@
+<a class="btn {{? it.active }}active{{?}}" {{? it.disabled }}disabled{{?}}>{{= it.label }}</a>
