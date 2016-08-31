@@ -1,7 +1,7 @@
 define(['require', 'app/models/Base', 'app/models/resource_category'], function (require, Base) {
     'use strict';
     return Base.extend({
-        urlRoot: 'http://localhost:32767/api/BusinessMan/roles',
+        urlRoot: '/api/BusinessMan/roles',
 
         relations: function ()
 		{

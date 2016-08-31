@@ -83,12 +83,69 @@
  		scheduler = require('scheduler'),
  		moment = require('moment'),
  		LoaderView,
+ 		ClashPopUpView,
+ 		NoClashPopUpView,
  		PopUpView;
+
+	ClashPopUpView = Backbone.View.extend({
+		tagName: 'div',
+		id: 'form',
+		template: require('text!template/scheduler/popup/clash.html'),
+
+		events: {
+			'click a.closeModal': 'closeModal',
+		},
+
+		initialize: function (data) {
+			this.data = data;
+			this.render();
+		},
+
+		closeModal : function (event)
+		{
+			event.preventDefault();
+			this.remove();
+		},
+
+		render: function () {
+			var data = {
+				data: this.data,
+			};
+			var compiledTemplate = _.template(this.template);
+			this.$el.html(compiledTemplate(data));
+		},
+	});
+
+	NoClashPopUpView = Backbone.View.extend({
+		tagName: 'div',
+		id: 'form',
+		template: require('text!template/scheduler/popup/noclash.html'),
+
+		events: {
+			'click a.closeModal': 'closeModal',
+		},
+
+		initialize: function () {
+			this.render();
+		},
+
+		closeModal : function (event)
+		{
+			event.preventDefault();
+			this.remove();
+		},
+
+		render: function () {
+			var compiledTemplate = _.template(this.template);
+			this.$el.html(compiledTemplate());
+		},
+	});
 
  	PopUpView = Backbone.View.extend({
  		tagName: 'div',
  		id: 'form',
  		template: require('text!template/scheduler/popup/form.html'),
+
  		events: {
  			'click a.saveModal': 'saveModal',
  			'click a.closeModal': 'closeModal',
@@ -217,106 +274,181 @@
  		},
 
  		onCommitClick: function (StartDate, EndDate) {
+ 			dhtmlx.message({ type:"msg", text:"Collating assets" });
+ 			this.conflict = [];
  			var contracts = new ContractsCollection();
+
+ 			var promises = [];
+
  			contracts.fetch({
  				data: {
  					fields: '*',
  					id: this.filter.contract[0]
  				},
  				success: _.bind(function () {
-
+ 					console.log(contracts.models);
  					_.each(this.plannedMaintenance.models, _.bind(function (model) {
  						if (model.get('new') == "Yes") {
  							if (new Date(model.get('start_date')) > new Date(StartDate.split("-").reverse().join("-") + 'T00:00') && new Date(model.get('end_date')) < new Date(EndDate.split("-").reverse().join("-") + 'T23:59')) {
+
+								var chkSched = new SchedCollection();
+								chkSched.fetch({
+									data: {
+										fields: '*,schedules.*,schedules.participants.*,participants.*',
+										start_date: model.get('start_date'),
+										start_time: model.get('start_time'),
+										end_time: ">=" + model.get('start_time'),
+										start_time: "<=" + model.get('end_time')
+									},
+								     success: _.bind(function()
+								     {
+								          //console.log(chkSched.models,model);
+								          //console.log(chkSched.models[0]._embedded['schedules:participants'][0].resource_id, model.get('default_resourceid'));
+								          if(chkSched.models.length) {
+								          	if (chkSched.models[0]._embedded['schedules:participants']){ 
+												if (chkSched.models[0]._embedded['schedules:participants'][0].resource_id == model.get('default_resourceid')) {
+								          			this.conflict.push(model.get('default_resource_name') + " : " + moment(model.get('start_date')).format('DD-MM-YYYY') + '\n');
+								          		}
+								      		}
+								          }
+								     }, this)
+								});
+
  								model.unset('new');
  								model.unset('frequency_period');
 								this.assetList.push(model);		// pushing 'scheduled' into array
- 								model.save();
+ 								promises.push(model.save());
  							}
  						}
 
  					}, this)); // end of plannedmaintenance each
- 				this.assetList.sort(function(a,b){return new Date(a.attributes.start_date).getTime() - new Date(b.attributes.start_date).getTime()});
- 				var oldDate = this.assetList[0].get('start_date');
- 				var holdArr = [];
- 				var len = this.assetList.length;
- 				_.each(this.assetList, function (asset) {
- 					len -= 1;
-					if (oldDate != asset.get('start_date') || len == 0) {
- 						if (len == 0) {holdArr.push(asset);}
- 						var jobDetails = "Assets: ";
- 						_.each(holdArr, function (item) {
- 							jobDetails += item.get('asset_recordid') + ' ';
+
+				dhtmlx.message({ type:"msg", text:"Checking for clashes in Scheduler" });
+
+ 				$.when.apply($, promises).done(_.bind(function () {
+ 					if (this.conflict.length !=0) {
+ 						var arr = (_.uniq(this.conflict)).sort();
+						var popTxt = {};
+ 						_.each(arr, function (msg, i) {
+ 							popTxt[i] = msg;
  						});
- 						var sd = holdArr[0].get('planned_start_timestamp');
- 						var ed = holdArr[0].get('planned_end_timestamp');
- 						var resourceID = holdArr[0].get('default_resourceid');
- 						var eventName = holdArr[0].get('maint_event_type');
- 						var roleID = holdArr[0].get('maint_eventid');
 
-  						var job = new JobModel({
- 							hrs_start: Number(sd.slice(11, 13)),
- 							mins_start: Number(sd.slice(14, 16)),
- 							hrs_finish: Number(ed.slice(11, 13)),
- 							mins_finish: Number(ed.slice(14, 16)),
- 							description: eventName + 'for Client: ' + contracts.models[0].get('client_company'),
- 							job_detail: jobDetails,
- 							notes: 'added via maintenance planner'
- 						}); // end of job
- 						job.save(null, {
- 							success: function (jobResponse) {
- 								var schedmodel = new SchedModel({
- 									all_day: 'No',
- 									description: eventName + 'for Client: ' + contracts.models[0].get('client_company'),
- 									end_date: ed.slice(0, 10),
- 									end_time: ed.slice(11, 16),
- 									scheduled: 1,
- 									start_time: sd.slice(11, 16),
- 									start_date: sd.slice(0, 10),
- 									job_number: jobResponse.id
- 								}); // end of schedmodel
- 								/* adding asset and job num to Job_Assets */
- 								_.each(holdArr, function (item) {
- 									var jobAsset = new JobAssetsModel({
- 										asset_id: item.get('asset_recordid'),
- 										job_id: jobResponse.id
- 									});
- 									jobAsset.save();
- 								});
-
- 								schedmodel.save(null, {
- 									success: function (mdl, response) {
- 										var participant = new ParticipantModel({
- 											event_name: eventName,
- 											resource_id: resourceID,
- 											schedule_id: response.id,
- 											role_id: roleID,
- 											group_id: response.group_id
- 										}); // end of participant
- 										participant.save(null, {
- 											success: function (newResponse) {
- 												job.set({ group_id: response.group_id });
- 												job.save();
- 											} // end of participant save success
- 										}); // end of participant save
- 									} // end of schedmodel save success
- 								}); // end of schedmodel save
- 							} // end of job save success
- 						}); // end of job save
-
-	 						holdArr = [];
-		 					holdArr.push(asset);
-							oldDate = asset.get('start_date');
+ 						var clashPopup = new ClashPopUpView({
+ 							'data': popTxt
+ 						});
+ 						this.$el.append(clashPopup.$el);
  					} else {
-	 					holdArr.push(asset);
-						oldDate = asset.get('start_date');
+ 						var noClashPopup = new NoClashPopUpView();
+ 						this.$el.append(noClashPopup.$el);
  					}
 
- 				}); //end of each loop
+ 					dhtmlx.message({ type:"msg", text:"Compiling data for jobs" });
+
+ 					// the following is a nasty little routine to make sure assets with the same date all get the same job number
+ 					this.assetList.sort(function(a,b){return new Date(a.attributes.start_date).getTime() - new Date(b.attributes.start_date).getTime()});
+	 				var oldDate = this.assetList[0].get('start_date');
+	 				var holdArr = [];
+	 				var holdObj = {};
+	 				var len = this.assetList.length;
+	 				var count = 0;
+
+	 				_.each(this.assetList, function (asset) {
+	 					len -= 1;
+		 					if (oldDate != asset.get('start_date')) {
+		 						if (len == 0) {
+		 							holdObj[count] = holdArr;
+		 							count++;
+		 							holdArr = []
+		 							holdArr.push(asset);
+		 							holdObj[count] = holdArr;
+		 						} else {
+		 							holdObj[count] = holdArr;
+		 							count++;
+		 							holdArr = [];
+		 							holdArr.push(asset);
+		 							oldDate = asset.get('start_date');
+		 						}
+		 					} else {
+		 						holdArr.push(asset);
+		 						holdObj[count] = holdArr;
+		 						oldDate = asset.get('start_date');
+		 					}
+	 				}); //end of each loop
+					_.each(holdObj, function (holdArr) {
+						var jobDetails = "Assets: ";
+	 					_.each(holdArr, function (item) {
+	 						jobDetails += item.get('asset_recordid') + ' '; // + item.get('start_date') + ' ';
+	 					});
+
+	 					var sd = holdArr[0].get('planned_start_timestamp');
+	 					var ed = holdArr[0].get('planned_end_timestamp');
+	 					var resourceID = holdArr[0].get('default_resourceid');
+	 					var eventName = holdArr[0].get('maint_event_type');
+	 					var roleID = holdArr[0].get('maint_eventid');
+
+	 					var job = new JobModel({
+	 						hrs_start: Number(sd.slice(11, 13)),
+	 						mins_start: Number(sd.slice(14, 16)),
+	 						hrs_finish: Number(ed.slice(11, 13)),
+	 						mins_finish: Number(ed.slice(14, 16)),
+	 						description: eventName + 'for Client: ' + contracts.models[0].get('client_company'),
+	 						job_detail: jobDetails,
+	 						account_no: contracts.models[0].get('account_no'),
+	 						key_managing_company: contracts.models[0].get('key_trading_companyid'),
+	 						notes: 'added via maintenance planner'
+	 					}); // end of job
+	 					job.save(null, {
+
+	 						success: function (jobResponse) {
+	 							dhtmlx.message({ type:"msg", text:"Job num " +jobResponse.id+ " created" });
+	 							var schedmodel = new SchedModel({
+	 								all_day: 'No',
+	 								description: eventName + 'for Client: ' + contracts.models[0].get('client_company'),
+	 								end_date: ed.slice(0, 10),
+	 								end_time: ed.slice(11, 16),
+	 								scheduled: 1,
+	 								start_time: sd.slice(11, 16),
+	 								start_date: sd.slice(0, 10),
+	 								job_number: jobResponse.id
+	 							}); // end of schedmodel
+	 							// adding asset and job num to Job_Assets 
+	 							_.each(holdArr, function (item) {
+	 								var jobAsset = new JobAssetsModel({
+	 									asset_id: item.get('asset_recordid'),
+	 									job_id: jobResponse.id,
+	 									pmid : item.get('id')
+	 								});
+	 								jobAsset.save();
+	 							});
+
+	 							schedmodel.save(null, {
+	 								success: function (mdl, response) {
+	 									dhtmlx.message({ type:"msg", text:"Job " + jobResponse.id + " scheduled" });
+	 									var participant = new ParticipantModel({
+	 										event_name: eventName,
+	 										resource_id: resourceID,
+	 										schedule_id: response.id,
+	 										role_id: roleID,
+	 										group_id: response.group_id
+	 									}); // end of participant
+	 									participant.save(null, {
+	 										success: function (newResponse) {
+	 											job.set({ group_id: response.group_id });
+	 											job.save();
+	 										} // end of participant save success
+	 									}); // end of participant save
+	 								} // end of schedmodel save success
+	 							}); // end of schedmodel save
+	 						} // end of job save success
+	 					}); // end of job save
+					});
+
+ 				}, this));
 
  				}, this) // end of contracts success
 
  			}); // end of contracts fetch
+
  		},
 
  		onFilterChange: function (filter, assets) {
@@ -336,10 +468,9 @@
  		createAssetViews: function () {
  			var assetArray = [];
  			this.assets.each(function (asset) {
- 				//console.log(asset);
  				assetArray.push({
  					key: asset.get('id'),
- 					label: '<i class="fa fa-angle-right"></i> ' + asset.get('maintenance_of')
+ 					label: '<i class="fa fa-angle-right"></i> ' + asset.get('maintenance_of') + '<br>&nbsp;&nbsp;(' + asset.get('default_resource_name') + ')'
  				});
  			});
  			scheduler.createTimelineView({
@@ -529,15 +660,19 @@
  												}
 										});
 
- 										if (!found) {
- 											lastDate = this.LastDate[scheduleItem.get('asset_recordid')] = moment(new Date()).format('YYYY-MM-DD');
+ 										//if (!found) {
+ 											//lastDate = this.LastDate[scheduleItem.get('asset_recordid')] = moment(new Date()).format('YYYY-MM-DD');
+ 											if (typeof scheduleItem.get('preferred_start_date') !== 'undefined') {
+ 											//lastDate = this.LastDate[scheduleItem.get('asset_recordid')] = scheduleItem.get('preferred_start_date');
+ 											lastDate = scheduleItem.get('preferred_start_date');
  											assetID = scheduleItem.get('asset_recordid');
- 										} else if (this.LastDate[assetID] === undefined) {
+ 										} /*else if (this.LastDate[assetID] === undefined) {
  											this.LastDate[assetID] = lastDate;
- 										}
+ 										}*/
  										var now, sd, ed;
  										now = sd = ed = lastDate;
- 										while ((new Date(sd) < new Date(scheduler._max_date)) && (new Date(sd) >= new Date(this.LastDate[assetID]))) {
+ 										//while ((new Date(sd) < new Date(scheduler._max_date)) && (new Date(sd) >= new Date(this.LastDate[assetID]))) {
+ 										while ((new Date(sd) < new Date(scheduler._max_date)) && (new Date(sd) >= new Date(lastDate))) {
  											now = new Date(sd);
  											now.setDate(now.getDate() + days[scheduleItem.get('frequency')] * scheduleItem.get('period'));
  											now.setHours(scheduleItem.get('preferred_time_hrs'));
@@ -580,10 +715,17 @@
  												start_date: sd.slice(0, 4) + "-" + sd.slice(5, 7) + "-" + sd.slice(8, 10),
  												start_time: scheduleItem.get('preferred_time_calc'),
  												end_date: ed.slice(0, 4) + "-" + ed.slice(5, 7) + "-" + ed.slice(8, 10),
- 												end_time: ed.slice(11, 16),
+ 												end_time: ed.slice(11, 16)
  											};
- 											// adding scheduled maintenace to planned to enable it to be displayed in the calendar
- 											this.plannedMaintenance.add(scheduledJobs);
+
+		 									var planned = this.plannedMaintenance.filter(function (p) {
+		 										return p.attributes.asset_recordid == scheduledJobs.asset_recordid && p.attributes.start_date == scheduledJobs.start_date;
+		 									});
+
+		 									if (planned.length == 0) {
+		 										this.plannedMaintenance.add(scheduledJobs);
+		 									}
+
 											sd = sd.replace(/\s/g,'T');			// hack to fix date problem in safari & firefox
  										}
  									}, this));

@@ -1,0 +1,25 @@
+<div class="modals-container">
+    <div class="bbm-wrapper" style="display: block;">
+        <div class="bbm-modal bbm-modal--open" style="opacity: 1;">
+            <div class="bbm-modal__topbar">
+                <h3 class="bbm-modal__title">Clash Report</h3>
+            </div>
+            <div class="bbm-modal__section">
+                        All maintenance has been scheduled however there are clashes for the resources below. Please go into the Scheduler to correct
+            <% _.each(data.data, function(clash) { %>
+                <div class="row">
+                    <div class="col-md-6">
+                        <%= clash.slice(0,clash.search(":")) %>
+                    </div>
+                    <div class="col-md-6">
+                        <%= clash.slice(clash.search(":")+1) %>
+                    </div>
+                </div>
+                <% }); %>
+            </div>
+            <div class="bbm-modal__bottombar">
+                <a href="" class="bbm-button closeModal">Close</a>
+            </div>
+        </div>
+    </div>
+</div>

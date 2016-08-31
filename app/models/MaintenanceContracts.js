@@ -2,7 +2,7 @@ define(['require', 'app/models/Base', 'app/models/MaintenanceAssets', 'app/model
     'use strict';
 
     return Base.extend({
-        urlRoot: 'http://localhost:32767/api/BusinessMan/maintenance_contracts',
+        urlRoot: '/api/BusinessMan/maintenance_contracts',
 
         relations: function () {
             return [

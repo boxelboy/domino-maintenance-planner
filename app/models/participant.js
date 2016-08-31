@@ -3,7 +3,7 @@ define(['require', 'app/models/Base', 'app/models/resource', 'app/models/role'],
 	'use strict';
 	return Base.extend(
 	{
-		urlRoot: 'http://localhost:32767/api/BusinessMan/participants',
+		urlRoot: '/api/BusinessMan/participants',
 		relations: function ()
 		{
 			return [

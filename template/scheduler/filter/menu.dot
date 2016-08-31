@@ -1,1 +1,10 @@
 <select data-placeholder="Select Contract"></select>
+
+<div class="key">
+<table>
+<tr><td>Committed</td><td><i class="fa fa-square planned"></i></td>
+<td>To be Committed</td><td><i class="fa fa-square unplanned"></i></td>
+<td>Overdue</td><td><i class="fa fa-square overdue"></i></td></tr>
+<tr><td>Completed</td><td><i class="fa fa-square completed"></i></td>
+<td>Escalated</td><td><i class="fa fa-square hold"></i></td></tr>
+</div>

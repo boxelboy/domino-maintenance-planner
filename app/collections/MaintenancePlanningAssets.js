@@ -2,7 +2,7 @@ define(['app/collections/Base', 'app/models/MaintenancePlanningAssets'], functio
     'use strict';
 
     return Base.extend({
-        url: 'http://localhost:32767/api/BusinessMan/maintenance_planning_assets',
+        url: '/api/BusinessMan/maintenance_planning_assets',
         rel: 'api:maintenance_planning_assets',
         model: MaintenancePlanningAssets
     });
